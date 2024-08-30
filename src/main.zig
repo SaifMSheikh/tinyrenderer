@@ -37,11 +37,11 @@ pub fn main()!void{
         for(0..3)|i|{
             const v0=model.verts.items[face[i]-1];
             const v1=model.verts.items[face[(i+1)%3]-1];
-            const x0:i64=@intFromFloat((v0[0]+1.0)*width/2.0);
-            const y0:i64=@intFromFloat((v0[1]+1.0)*height/2.0);
-            const x1:i64=@intFromFloat((v1[0]+1.0)*width/2.0);
-            const y1:i64=@intFromFloat((v1[1]+1.0)*height/2.0);
-            img.drawLine(x0,y0,x1,y1,.{255}**3);
+            var x0:i64=@intFromFloat((v0[0]+1.0)*width/2.0);
+            var y0:i64=@intFromFloat((v0[1]+1.0)*height/2.0);
+            var x1:i64=@intFromFloat((v1[0]+1.0)*width/2.0);
+            var y1:i64=@intFromFloat((v1[1]+1.0)*height/2.0);
+            img.drawLine(&x0,&y0,&x1,&y1,.{255}**3);
         }
     }
     std.debug.print("Done.\n",.{});
