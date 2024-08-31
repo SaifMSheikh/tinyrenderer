@@ -82,7 +82,7 @@ pub const Model=struct{
         }
     }
 //Utility Functions
-    fn magnitude(vert:Vertex)f32{
+    pub fn magnitude(vert:Vertex)f32{
         var out:f32=1;
         for(0..3)|i|out*=std.math.pow(f32,vert[i],2);
         return std.math.sqrt(out);
