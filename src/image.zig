@@ -4,8 +4,12 @@ pub const Image=struct{
     width:u64,
     height:u64,
     pdata:*[]u8,
+    zbuf:*[]f32,
 //Types
     const Color=[3]u8;
+    const Error=error{
+        OutOfBounds,
+    };
 //Draw Functions
     pub fn setColor(self:*Image,x:u64,y:u64,color:Color)void{
         var offset=3*(x+y*self.width);
@@ -41,37 +45,57 @@ pub const Image=struct{
             else{self.setColor(x,@intFromFloat(y),color);}
         }
     }
-    pub fn drawTriangle(self:*Image,a0:f32,b0:f32,a1:f32,b1:f32,a2:f32,b2:f32,color:[3]u8)void{
+    pub fn drawTriangle(self:*Image,coords:[3][3]f32,color:[3]u8)void{
         //Clamp Vertices
-        const x0:f32=std.math.clamp(a0,0.0,@as(f32,@floatFromInt(self.width)));
-        const x1:f32=std.math.clamp(a1,0.0,@as(f32,@floatFromInt(self.width)));
-        const x2:f32=std.math.clamp(a2,0.0,@as(f32,@floatFromInt(self.width)));
-        const y0:f32=std.math.clamp(b0,0.0,@as(f32,@floatFromInt(self.height)));
-        const y1:f32=std.math.clamp(b1,0.0,@as(f32,@floatFromInt(self.height)));
-        const y2:f32=std.math.clamp(b2,0.0,@as(f32,@floatFromInt(self.height)));
-        if(y0==y1 and y0==y2)return;
+        var verts:[3][3]f32=undefined;
+        for(0..3)|i|{
+            for(0..2)|j|{
+                verts[i][j]=std.math.clamp(
+                    coords[i][j],
+                    0.0,
+                    @as(
+                        f32,
+                        @floatFromInt(
+                            if(j==0)self.width 
+                            else self.height
+                        )
+                    )
+                );
+            }
+            verts[i][2]=coords[i][2];
+        }
         //Compute Bounding Box
-        var xmin=x0;
-        if(xmin>x1)xmin=x1;
-        if(xmin>x2)xmin=x2;
-        var xmax=x0;
-        if(xmax<x1)xmax=x1;
-        if(xmax<x2)xmax=x2;
-        var ymin=y0;
-        if(ymin>y1)ymin=y1;
-        if(ymin>y2)ymin=y2;
-        var ymax=y0;
-        if(ymax<y1)ymax=y1;
-        if(ymax<y2)ymax=y2;
+        var xmin=verts[0][0];
+        if(xmin>verts[1][0])xmin=verts[1][0];
+        if(xmin>verts[2][0])xmin=verts[2][0];
+        var xmax=verts[0][0];
+        if(xmax<verts[1][0])xmax=verts[1][0];
+        if(xmax<verts[2][0])xmax=verts[2][0];
+        var ymin=verts[0][1];
+        if(ymin>verts[1][1])ymin=verts[1][1];
+        if(ymin>verts[2][1])ymin=verts[2][1];
+        var ymax=verts[0][1];
+        if(ymax<verts[1][1])ymax=verts[1][1];
+        if(ymax<verts[2][1])ymax=verts[2][1];
         //Test Pixels
         var x:f32=xmin;
         while(x<=xmax):(x+=0.5){
+            if(x<0.0)unreachable;
             var y:f32=ymin;
             while(y<=ymax):(y+=0.5){
-                const bc=barycentric(x0,y0,x1,y1,x2,y2,x,y);
-                if(bc[0]<0.0 or bc[1]<0.0 or bc[2]<0.0){continue;}
-                else if(bc[0]>1.0 or bc[1]>1.0 or bc[2]>1.0){continue;}
-                else{self.setColor(@intFromFloat(x),@intFromFloat(y),color);}
+                if(y<0.0)unreachable;
+                //Check If Pixel Is In Triangle
+                const bc=barycentric(verts,x,y);
+                if(bc[0]<0.0 or bc[1]<0.0 or bc[2]<0.0)continue;
+                if(bc[0]>1.0 or bc[1]>1.0 or bc[2]>1.0)continue;
+                //Check Z-Buffer
+                var z:f32=0.0;
+                for(0..3)|i|z+=verts[i][2]*bc[i];
+                if(self.getZ(@intFromFloat(x),@intFromFloat(y)).?<z){
+                    //Update Z-Buffer & Draw Pixel
+                    self.setZ(@intFromFloat(x),@intFromFloat(y),z);
+                    self.setColor(@intFromFloat(x),@intFromFloat(y),color);
+                }
             }
         }
     }
@@ -87,7 +111,7 @@ pub const Image=struct{
         }
     }
 //Utility Functions
-    pub fn getColor(self:*Image,x:u64,y:u64)Color{
+    pub fn getColor(self:*Image,x:usize,y:usize)Color{
         var offset=3*(x+y*self.width);
         while(offset+3>=3*self.height*self.width)
             offset-=1;
@@ -97,16 +121,26 @@ pub const Image=struct{
             self.pdata.ptr[2+offset]
         };
     }
-    fn barycentric(x0:f32,y0:f32,x1:f32,y1:f32,x2:f32,y2:f32,px:f32,py:f32)[3]f32{
+    fn getZ(self:*Image,x:usize,y:usize)?f32{
+        const offset=x+y*self.width;
+        if(offset>=self.height*self.width)return null;
+        return self.zbuf.ptr[offset];
+    }
+    fn setZ(self:*Image,x:usize,y:usize,z:f32)void{
+        const offset=x+y*self.width;
+        if(offset>=self.height*self.width)return;
+        self.zbuf.ptr[offset]=z;
+    }
+    fn barycentric(verts:[3][3]f32,x:f32,y:f32)[3]f32{
         const a:[3]f32=.{
-            x2-x0,
-            x1-x0,
-            x0-px
+            verts[2][0]-verts[0][0],
+            verts[1][0]-verts[0][0],
+            verts[0][0]-x
         };
         const b:[3]f32=.{
-            y2-y0,
-            y1-y0,
-            y0-py
+            verts[2][1]-verts[0][1],
+            verts[1][1]-verts[0][1],
+            verts[0][1]-y
         };
         const c:[3]f32=.{
             a[1]*b[2]-a[2]*b[1],

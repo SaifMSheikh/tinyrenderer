@@ -29,12 +29,15 @@ pub fn main()!void{
     //Empty Image
     var data=try allocator.alloc(u8,width*height*3);
     defer allocator.free(data);
-    var img=Image{.height=height,.width=width,.pdata=&data};
+    var zbuf=try allocator.alloc(f32,width*height);
+    defer allocator.free(zbuf);
+    for(0..width*height)|i|{zbuf[i]=-std.math.inf(f32);}
+    var img=Image{.height=height,.width=width,.zbuf=&zbuf,.pdata=&data};
     for(0..(3*width*height))|i|{data.ptr[i]=0;}
     //Draw
     std.debug.print("Processing {} vertices...",.{model.verts.items.len});
     const light_dir:[3]f32=.{0,0,-1};
-    var scrn_coords:[3][2]f32=undefined;
+    var scrn_coords:[3][3]f32=undefined;
     var wrld_coords:[3][3]f32=undefined;
     for(model.faces.items)|face|{
         //Fetch Vertices
@@ -42,6 +45,7 @@ pub fn main()!void{
             wrld_coords[i]=model.verts.items[face[i]-1];
             scrn_coords[i][0]=(wrld_coords[i][0]+1.0)*width/2.0;
             scrn_coords[i][1]=(wrld_coords[i][1]+1.0)*height/2.0;
+            scrn_coords[i][2]=wrld_coords[i][2];
         }
         //Compute Shade
         var a:[3]f32=undefined;
@@ -60,12 +64,11 @@ pub fn main()!void{
         //Draw Face
         if(intensity<0.0)continue;
         img.drawTriangle(
-            scrn_coords[0][0],scrn_coords[0][1],
-            scrn_coords[1][0],scrn_coords[1][1],
-            scrn_coords[2][0],scrn_coords[2][1],
+            scrn_coords,
             .{@as(u8,@intFromFloat(255.0*intensity))}**3
         );
     }
+    //Wireframe For Debugging
 //    for(model.faces.items)|face|{
 //        for(0..3)|i|{
 //            const v0=model.verts.items[face[i]-1];
@@ -74,7 +77,7 @@ pub fn main()!void{
 //            const y0:i64=@intFromFloat((v0[1]+1.0)*height/2.0);
 //            const x1:i64=@intFromFloat((v1[0]+1.0)*width/2.0);
 //            const y1:i64=@intFromFloat((v1[1]+1.0)*height/2.0);
-//            img.drawLine(x0,y0,x1,y1,.{255}**3);
+//            img.drawLine(x0,y0,x1,y1,.{50,50,125});
 //        }
 //    }
     std.debug.print("Done.\n",.{});
