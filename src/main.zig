@@ -6,9 +6,7 @@ pub fn main()!void{
     const allocator=gpa.allocator();
     defer if(gpa.deinit()==.leak){std.debug.print("GPA detected leak\n",.{});};
     //Load Model Data From Input File
-    var arena_allocator=std.heap.ArenaAllocator.init(allocator);
-    defer arena_allocator.deinit();
-    var model=try Model.init("obj/african_head.obj",arena_allocator.allocator());
+    var model=try Model.init("obj/african_head.obj",allocator);
     defer model.deinit();
     //Open Output File
     const file=try std.fs.cwd().createFile("img.tga",.{.read=true});
@@ -35,14 +33,15 @@ pub fn main()!void{
     var img=Image{.height=height,.width=width,.zbuf=&zbuf,.pdata=&data};
     for(0..(3*width*height))|i|{data.ptr[i]=0;}
     //Draw
-    std.debug.print("Processing {} vertices...",.{model.verts.items.len});
+    std.debug.print("Processing {} vertices...",.{model.verts.len});
     const light_dir:[3]f32=.{0,0,-1};
     var scrn_coords:[3][3]f32=undefined;
     var wrld_coords:[3][3]f32=undefined;
-    for(model.faces.items)|face|{
+    for(0..model.faces.len)|f|{
+        const face=model.faces[f];
         //Fetch Vertices
         for(0..3)|i|{
-            wrld_coords[i]=model.verts.items[face[i]-1];
+            wrld_coords[i]=model.verts[face[i]-1];
             scrn_coords[i][0]=(wrld_coords[i][0]+1.0)*width/2.0;
             scrn_coords[i][1]=(wrld_coords[i][1]+1.0)*height/2.0;
             scrn_coords[i][2]=wrld_coords[i][2];
