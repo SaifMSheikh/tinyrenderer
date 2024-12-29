@@ -1,5 +1,4 @@
 const std=@import("std");
-
 pub const Model=struct{
 //Data
     allocator:std.mem.Allocator,
@@ -128,3 +127,16 @@ pub const Model=struct{
         return std.math.sqrt(out);
     }
 };
+//Tests
+test "test model init with valid file"{
+    const alloc=std.heap.page_allocator;
+    var model=try Model.init("obj/teapot.obj",alloc);
+    std.debug.assert(model.verts.len>0);
+    std.debug.assert(model.faces.len>0);
+    model.deinit();
+}
+test "test model init with invalid file" {
+    _=Model.init("obj/non_existent.obj",std.heap.page_allocator) catch return;
+    unreachable;
+}
+

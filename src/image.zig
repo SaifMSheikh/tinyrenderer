@@ -1,15 +1,52 @@
 const std=@import("std");
 pub const Image=struct{
 //Data
-    width:u64,
-    height:u64,
-    pdata:*[]u8,
-    zbuf:*[]f32,
+    width:u32,
+    height:u32,
+    pdata:[]u8,
+    zbuf:[]f32,
+    alloc:std.mem.Allocator,
 //Types
     const Color=[3]u8;
     const Error=error{
         OutOfBounds,
     };
+//Image Buffer RAII
+    pub fn init(width:u16,height:u16,alloc:std.mem.Allocator)!Image{
+        const width32:u32=@intCast(width);
+        const height32:u32=@intCast(height);
+        const img=Image{
+            .width=width32,
+            .height=height32,
+            .pdata=try alloc.alloc(u8,width32*height32*3),
+            .zbuf=try alloc.alloc(f32,width32*height32),
+            .alloc=alloc
+        };
+        for(0..img.width*img.height)|i|{img.zbuf[i]=-std.math.inf(f32);}
+        for(0..(3*img.width*img.height))|i|{img.pdata[i]=0;}
+        return img;
+    }
+    pub fn deinit(self:*Image)void{
+        self.alloc.free(self.pdata);
+        self.alloc.free(self.zbuf);
+    }
+    pub fn write(self:*Image,fname:[]const u8)!void{
+        const file=try std.fs.cwd().createFile(fname,.{.read=true});
+        defer file.close();
+        std.debug.print("Writing to disk...",.{});
+        const header:[18]u8=.{
+            0,0,2,0,0,0,0,0,0,0,0,0,
+            @intCast(self.width&255),
+            @intCast((self.width>>8)&255),
+            @intCast(self.height&255),
+            @intCast((self.height>>8)&255),
+            24,
+            0b00100000
+        };
+        try file.writeAll(&header);
+        try file.writeAll(self.pdata); 
+        std.debug.print("Done!\n",.{});
+    }
 //Draw Functions
     pub fn setColor(self:*Image,x:u64,y:u64,color:Color)void{
         var offset=3*(x+y*self.width);
@@ -100,7 +137,7 @@ pub const Image=struct{
         }
     }
 //Edit Functions
-    pub fn flip_vertical(self:*Image)void{
+    pub fn flipV(self:*Image)void{
         var tmp_color:Color=undefined;
         for(0..self.height/2)|y|{
             for(0..self.width)|x|{
@@ -155,3 +192,44 @@ pub const Image=struct{
         };
     }
 };
+//Tests
+fn color_eq(a:Image.Color,b:Image.Color)bool{
+    for(0..3)|i|if(a[i]!=b[i])return false;
+    return true;
+}
+test"Test `setColor`"{
+    var alloc=std.heap.page_allocator;
+    var img=Image{
+        .width=10,
+        .height=10,
+        .pdata=alloc.alloc(u8,300) catch unreachable,
+        .zbuf=alloc.alloc(f32,100) catch unreachable,
+        .alloc=alloc
+    };
+    defer alloc.free(img.pdata);
+    defer alloc.free(img.zbuf);
+    const color:Image.Color=[3]u8{255,0,0};
+    img.setColor(5,5,color);
+    const pixel_color=img.getColor(5,5);
+    std.debug.assert(color_eq(pixel_color,color));
+}
+//test"Test `flip_vertical`"{
+//    const alloc=std.heap.page_allocator;
+//    var img=Image{
+//        .width=10,
+//        .height=10,
+//        .pdata=try alloc.alloc(u8,300),
+//        .zbuf=try alloc.alloc(f32,100),
+//        .alloc=alloc
+//    };
+//    defer alloc.free(img.pdata);
+//    defer alloc.free(img.zbuf);
+//    for(0..3)|i|img.setColor(i,0,[3]u8{255,0,0});
+//    std.debug.assert(color_eq(img.getColor(0,0),[3]u8{255,0,0}));
+//    std.debug.assert(color_eq(img.getColor(1,0),[3]u8{255,0,0}));
+//    std.debug.assert(color_eq(img.getColor(2,0),[3]u8{255,0,0}));
+//    img.flipV();
+//    std.debug.assert(color_eq(img.getColor(0,2),[3]u8{255,0,0}));
+//    std.debug.assert(color_eq(img.getColor(1,2),[3]u8{255,0,0}));
+//    std.debug.assert(color_eq(img.getColor(2,2),[3]u8{255,0,0}));
+//}

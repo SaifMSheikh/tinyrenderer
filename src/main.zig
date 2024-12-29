@@ -1,37 +1,21 @@
+const Config=@import("config.zig").Config;
 const Image=@import("image.zig").Image;
 const Model=@import("model.zig").Model;
 const std=@import("std");
 pub fn main()!void{
+    //Extract Command Line Arguments
+    const cfg=try Config.parseArgs();
+    //Initialize Allocator
     var gpa=std.heap.GeneralPurposeAllocator(.{}){};
     const allocator=gpa.allocator();
     defer if(gpa.deinit()==.leak){std.debug.print("GPA detected leak\n",.{});};
     //Load Model Data From Input File
-    var model=try Model.init("obj/african_head.obj",allocator);
+    var model=try Model.init(cfg.infile,allocator);
+    model.scale(cfg.scale);
     defer model.deinit();
-    //Open Output File
-    const file=try std.fs.cwd().createFile("img.tga",.{.read=true});
-    defer file.close();
-    //Write Header
-    const width:u32=1000;
-    const height:u32=1000;
-    const header:[18]u8=.{
-        0,0,2,0,0,0,0,0,0,0,0,0,
-        width&255,
-        (width>>8)&255,
-        height&255,
-        (height>>8)&255,
-        24,
-        0b00100000
-    };
-    try file.writeAll(&header);
-    //Empty Image
-    var data=try allocator.alloc(u8,width*height*3);
-    defer allocator.free(data);
-    var zbuf=try allocator.alloc(f32,width*height);
-    defer allocator.free(zbuf);
-    for(0..width*height)|i|{zbuf[i]=-std.math.inf(f32);}
-    var img=Image{.height=height,.width=width,.zbuf=&zbuf,.pdata=&data};
-    for(0..(3*width*height))|i|{data.ptr[i]=0;}
+    //Create Empty Image
+    var img=try Image.init(cfg.width,cfg.height,allocator);
+    defer img.deinit();
     //Draw
     std.debug.print("Processing {} vertices...",.{model.verts.len});
     const light_dir:[3]f32=.{0,0,-1};
@@ -42,8 +26,8 @@ pub fn main()!void{
         //Fetch Vertices
         for(0..3)|i|{
             wrld_coords[i]=model.verts[face[i]-1];
-            scrn_coords[i][0]=(wrld_coords[i][0]+1.0)*width/2.0;
-            scrn_coords[i][1]=(wrld_coords[i][1]+1.0)*height/2.0;
+            scrn_coords[i][0]=(wrld_coords[i][0]+1.0)*@as(f32,@floatFromInt(cfg.width))/2.0+cfg.x_offset;
+            scrn_coords[i][1]=(wrld_coords[i][1]+1.0)*@as(f32,@floatFromInt(cfg.height))/2.0+cfg.y_offset;
             scrn_coords[i][2]=wrld_coords[i][2];
         }
         //Compute Shade
@@ -68,21 +52,20 @@ pub fn main()!void{
         );
     }
     //Wireframe For Debugging
-//    for(model.faces.items)|face|{
-//        for(0..3)|i|{
-//            const v0=model.verts.items[face[i]-1];
-//            const v1=model.verts.items[face[(i+1)%3]-1];
-//            const x0:i64=@intFromFloat((v0[0]+1.0)*width/2.0);
-//            const y0:i64=@intFromFloat((v0[1]+1.0)*height/2.0);
-//            const x1:i64=@intFromFloat((v1[0]+1.0)*width/2.0);
-//            const y1:i64=@intFromFloat((v1[1]+1.0)*height/2.0);
-//            img.drawLine(x0,y0,x1,y1,.{50,50,125});
-//        }
-//    }
-    std.debug.print("Done.\n",.{});
+    if(cfg.f_wire){
+        for(model.faces)|face|{
+            for(0..3)|i|{
+                const v0=model.verts[face[i]-1];
+                const v1=model.verts[face[(i+1)%3]-1];
+                const x0:i64=@intFromFloat((v0[0]+1.0)*@as(f32,@floatFromInt(cfg.width))/2.0+cfg.x_offset);
+                const y0:i64=@intFromFloat((v0[1]+1.0)*@as(f32,@floatFromInt(cfg.height))/2.0+cfg.y_offset);
+                const x1:i64=@intFromFloat((v1[0]+1.0)*@as(f32,@floatFromInt(cfg.width))/2.0+cfg.x_offset);
+                const y1:i64=@intFromFloat((v1[1]+1.0)*@as(f32,@floatFromInt(cfg.height))/2.0+cfg.y_offset);
+                img.drawLine(x0,y0,x1,y1,.{50,50,125});
+            }
+        }
+    }
     //Write To File
-    img.flip_vertical();
-    std.debug.print("Saving to disk...",.{});
-    try file.writeAll(data);
-    std.debug.print("Done!\n",.{});
+    img.flipV();
+    try img.write(cfg.outfile);
 }
