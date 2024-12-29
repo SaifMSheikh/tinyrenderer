@@ -1,14 +1,24 @@
 const std=@import("std");
+///Encapsulates configuration state, taken from command-line arguments.
 pub const Config=struct{
+    ///Input model file.
     infile:[]const u8="obj/teapot.obj",
+    ///Output image file.
     outfile:[]const u8="img.tga",
+    ///Output Image width.
     width:u16=1024,
+    ///Output Image height.
     height:u16=1024,
+    ///Specifies whether or not to draw wireframe.
     f_wire:bool=false,
+    ///Screen-space X-offset.
     x_offset:f32=0.0,
+    ///Screen-space Y-offset.
     y_offset:f32=0.0,
+    ///Input Model scale.
     scale:f32=1.0,
     const Error=error{InvalidArgument,InvalidCharacter,Overflow};
+    ///Extracts configuration state from command-line arguments.
     pub fn parseArgs()Config.Error!Config{
         //Extract Command Line Arguments
         const args=std.os.argv;

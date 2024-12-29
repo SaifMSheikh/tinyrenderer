@@ -1,17 +1,26 @@
 const std=@import("std");
+///Image buffer abstraction struct.
 pub const Image=struct{
 //Data
-    width:u32,
-    height:u32,
-    pdata:[]u8,
-    zbuf:[]f32,
     alloc:std.mem.Allocator,
+    ///Width of the output image.
+    width:u32,
+    ///Height of the output image.
+    height:u32,
+    ///Runtime image buffer.
+    pdata:[]u8,
+    ///Runtime Z-Buffer.
+    zbuf:[]f32,
 //Types
+    ///A color is only RGB values, for now.
     const Color=[3]u8;
-    const Error=error{
-        OutOfBounds,
-    };
+    const Error=error{OutOfBounds};
 //Image Buffer RAII
+    ///Initializes a new image buffer.
+    ///# Parameters
+    ///- width : The width of the image.
+    ///- height : The height of the image.
+    ///- alloc : Will be used to back the runtime image buffer.
     pub fn init(width:u16,height:u16,alloc:std.mem.Allocator)!Image{
         const width32:u32=@intCast(width);
         const height32:u32=@intCast(height);
@@ -26,10 +35,14 @@ pub const Image=struct{
         for(0..(3*img.width*img.height))|i|{img.pdata[i]=0;}
         return img;
     }
+    ///Frees runtime image & z-buffer.
     pub fn deinit(self:*Image)void{
         self.alloc.free(self.pdata);
         self.alloc.free(self.zbuf);
     }
+    ///Writes the image to a specified output file.
+    ///# Parameters
+    ///- fname : Path to the output file to be written.
     pub fn write(self:*Image,fname:[]const u8)!void{
         const file=try std.fs.cwd().createFile(fname,.{.read=true});
         defer file.close();
@@ -48,12 +61,24 @@ pub const Image=struct{
         std.debug.print("Done!\n",.{});
     }
 //Draw Functions
+    ///Sets the color of a specific pixel to a specifec color.
+    ///# Parameters
+    ///- x : X-coordinate of the pixel.
+    ///- y : Y-coorfinate of the pixel.
+    ///- color : Color to be written.
     pub fn setColor(self:*Image,x:u64,y:u64,color:Color)void{
         var offset=3*(x+y*self.width);
         while(offset+3>=3*self.height*self.width)
             offset-=1;
         for(0..3)|i|{self.pdata.ptr[offset+i]=color[i];}
     }
+    ///Draws a line between two specific pixels.
+    ///# Parameters
+    ///- a0 : X-Coordinate of the first pixel.
+    ///- b0 : Y-Coordinate of the first pixel.
+    ///- a1 : X-Coordinate of the second pixel.
+    ///- b1 : Y-Coordinate of the second pixel.
+    ///- color : Color of the line.
     pub fn drawLine(self:*Image,a0:i64,b0:i64,a1:i64,b1:i64,color:Color)void{
         //Order Endpoints
         const transpose:bool=@abs(a1-a0)<@abs(b1-b0);
@@ -82,6 +107,7 @@ pub const Image=struct{
             else{self.setColor(x,@intFromFloat(y),color);}
         }
     }
+    ///Draws a triangle of some specific color between three specific points.
     pub fn drawTriangle(self:*Image,coords:[3][3]f32,color:[3]u8)void{
         //Clamp Vertices
         var verts:[3][3]f32=undefined;
@@ -137,6 +163,7 @@ pub const Image=struct{
         }
     }
 //Edit Functions
+    ///Mirrors the image about the horizontal axis.
     pub fn flipV(self:*Image)void{
         var tmp_color:Color=undefined;
         for(0..self.height/2)|y|{
@@ -148,6 +175,10 @@ pub const Image=struct{
         }
     }
 //Utility Functions
+    ///Returns the color of a specific pixel.
+    ///# Parameters
+    ///- x : X-coordinate of the pixel.
+    ///- y : Y-coordinate of the pixel.
     pub fn getColor(self:*Image,x:usize,y:usize)Color{
         var offset=3*(x+y*self.width);
         while(offset+3>=3*self.height*self.width)
@@ -158,16 +189,29 @@ pub const Image=struct{
             self.pdata.ptr[2+offset]
         };
     }
+    ///Returns the current z-value (depth) of a pixel.
+    ///# Parameters
+    ///- x : X-coordinate of the pixel.
+    ///- y : Y-coordinate of the pixel.
     fn getZ(self:*Image,x:usize,y:usize)?f32{
         const offset=x+y*self.width;
         if(offset>=self.height*self.width)return null;
         return self.zbuf.ptr[offset];
     }
+    ///Sets the current z-value (depth) of a pixel to a specific value.
+    ///# Parameters
+    ///- x : X-coordinate of the pixel.
+    ///- y : Y-coordinate of the pixel.
+    ///- z : Z-value to be written.
     fn setZ(self:*Image,x:usize,y:usize,z:f32)void{
         const offset=x+y*self.width;
         if(offset>=self.height*self.width)return;
         self.zbuf.ptr[offset]=z;
     }
+    ///Returns the barycentric coordinates of a specific point, relative to a given triangle.
+    ///- verts : Coordinates of each vertex of the triangle.
+    ///- x : X-coordinate of the pixel.
+    ///- y : Y-coordinate of the pixel.
     fn barycentric(verts:[3][3]f32,x:f32,y:f32)[3]f32{
         const a:[3]f32=.{
             verts[2][0]-verts[0][0],
@@ -193,11 +237,12 @@ pub const Image=struct{
     }
 };
 //Tests
+///Tests whether or not two given colors are the same.
 fn color_eq(a:Image.Color,b:Image.Color)bool{
     for(0..3)|i|if(a[i]!=b[i])return false;
     return true;
 }
-test"Test `setColor`"{
+test"Test `setColor` & `getColor`"{
     var alloc=std.heap.page_allocator;
     var img=Image{
         .width=10,

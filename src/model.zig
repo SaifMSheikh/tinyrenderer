@@ -1,13 +1,25 @@
 const std=@import("std");
+///3D Model abstraction & interface.
 pub const Model=struct{
 //Data
     allocator:std.mem.Allocator,
+    ///List of object vertices.
     verts:[]Vertex,
+    ///List of object faces.
     faces:[]Face,
 //Types
+    ///Each vertex is a triple of object-space coordinates.
     const Vertex=[3]f32;
+    ///Each face is a triple of vertex indices.
     const Face=[3]u32;
 //Methods
+    ///Initializes a new object model from a .OBJ file.
+    ///# Parameters
+    ///- `filename` : Input file containing model information. Must be a valid .OBJ file for now.
+    ///- `allocator` : Allocator to back dynamic storage for vertex & face list.
+    ///# Returns
+    ///Returns a new Model struct, constructed from the data in the input file.
+    ///Returns an error if any of the syscalls fails.
     pub fn init(filename:[]const u8,allocator:std.mem.Allocator)!Model{
     //Open Input File
         std.debug.print("Loading Model : \"{s}\"\n",.{filename});
@@ -108,11 +120,13 @@ pub const Model=struct{
     //Done
         return model;
     }
+    ///Cleans up Model struct instance.
     pub fn deinit(self:*Model)void{
         self.allocator.free(self.verts);
         self.allocator.free(self.faces);
     }
 //Transform Functions
+    ///Scales a Model by some scale factor.
     pub fn scale(self:*Model,factor:f32)void{
         for(0..self.verts.len)|i|{
             for(0..3)|j|{
@@ -121,6 +135,7 @@ pub const Model=struct{
         }
     }
 //Utility Functions
+    ///Returns the magnitude of a given vertex.
     pub fn magnitude(vert:Vertex)f32{
         var out:f32=1;
         for(0..3)|i|out*=std.math.pow(f32,vert[i],2);

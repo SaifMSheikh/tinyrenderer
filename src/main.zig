@@ -2,6 +2,7 @@ const Config=@import("config.zig").Config;
 const Image=@import("image.zig").Image;
 const Model=@import("model.zig").Model;
 const std=@import("std");
+///Application entry point.
 pub fn main()!void{
     //Extract Command Line Arguments
     const cfg=try Config.parseArgs();
