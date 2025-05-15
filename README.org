@@ -1,18 +1,17 @@
 #+title: Saif's Nth Renderer
 #+author: Saif Sheikh
 #+description: Design & notes for yet another renderer. Not really sure where it'll end up just yet.
-
 * Introduction
 Here's the latest in my endless stream of nearly-good renderers.
 My goals with this iteration changed over time, but in general they've been to:
-+ Get to grips with =Zig= as a language.
++ Get to grips with *Zig* as a language.
 + Figure out what kind of performance gains I can get by applying [[https://dataorienteddesign.com/][data-oriented desgin]] in a practical application.
-+ Familiarize myself with some of the =fun math behind popular rendering techniques= - both new and old - _by implementing them myself_.
++ Familiarize myself with some of the *fun math behind popular rendering techniques* - both new and old - _by implementing them myself_.
 ... and maybe most importantly:
 + _TO *STOP ABANDONING RENDERERS* HALFWAY THROUGH._
-  Because this is starting to get seriously depressing now :(.
+Because this is starting to get seriously depressing now :(.
 * Feature Checklist [0/4]
-+ [ ] System Design & Refactor 1.0 :: Get the major subsystems designed for =scalability and performance=. Ideally do this before any other major work.
++ [ ] System Design & Refactor 1.0 :: Get the major subsystems designed for *scalability and performance*. Ideally do this before any other major work.
 + [ ] Models & Loaders :: Support for major file formats.
 + [ ] Ray Tracing  :: Support for some kind of ray tracing for illumination.
 + [ ] CUDA/C Integration :: Try to see what kind of performance we can get using CUDA/Optix. Look into C interop.
